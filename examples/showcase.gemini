@@ -1,0 +1,15 @@
+var i = 0;
+while (i < 5) {
+    print(i);
+    i = i + 1;
+}
+
+if (i == 5) {
+    print("Done!");
+} else {
+    print("Error");
+}
+
+for (var j = 0; j < 3; j = j + 1) {
+    print(j);
+}
