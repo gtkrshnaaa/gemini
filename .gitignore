@@ -1,0 +1,21 @@
+# Compiled binaries and object files
+bin/
+obj/
+
+# Source code listing directory
+z_listing/
+
+# IDE and editor files
+.vscode/
+*.swp
+*.swo
+.idea/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Miscellaneous
+*.o
+*.out
+*.exe
