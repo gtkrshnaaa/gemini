@@ -10,16 +10,31 @@ static unsigned int hash(const char* key, int length) {
     return hash % TABLE_SIZE;
 }
 
-// Find or insert variable
-static VarEntry* findEntry(Environment* env, Token name, bool insert) {
+// Find or insert variable with proper scope resolution
+static VarEntry* findEntry(VM* vm, Token name, bool insert) {
     unsigned int h = hash(name.start, name.length);
-    VarEntry* entry = env->buckets[h];
+    
+    // First, search in current environment
+    VarEntry* entry = vm->env->buckets[h];
     while (entry) {
         if (strncmp(entry->key, name.start, name.length) == 0 && strlen(entry->key) == (size_t)name.length) {
             return entry;
         }
         entry = entry->next;
     }
+    
+    // If not found and not inserting, search in global environment (if different from current)
+    if (!insert && vm->env != vm->globalEnv) {
+        entry = vm->globalEnv->buckets[h];
+        while (entry) {
+            if (strncmp(entry->key, name.start, name.length) == 0 && strlen(entry->key) == (size_t)name.length) {
+                return entry;
+            }
+            entry = entry->next;
+        }
+    }
+    
+    // If inserting, create new entry in current environment
     if (insert) {
         entry = malloc(sizeof(VarEntry));
         if (!entry) {
@@ -32,8 +47,8 @@ static VarEntry* findEntry(Environment* env, Token name, bool insert) {
         }
         entry->value.type = VAL_INT; // Default init
         entry->value.intVal = 0;
-        entry->next = env->buckets[h];
-        env->buckets[h] = entry;
+        entry->next = vm->env->buckets[h];
+        vm->env->buckets[h] = entry;
     }
     return entry;
 }
@@ -179,7 +194,7 @@ static void execute(VM* vm, Node* node) {
             if (node->var_decl.initializer) {
                 init = evaluate(vm, node->var_decl.initializer);
             }
-            VarEntry* entry = findEntry(vm->env, node->var_decl.name, true);
+            VarEntry* entry = findEntry(vm, node->var_decl.name, true);
             if (entry) {
                 // Free old string value if exists
                 if (entry->value.type == VAL_STRING && entry->value.stringVal) {
@@ -191,7 +206,7 @@ static void execute(VM* vm, Node* node) {
         }
         case NODE_STMT_ASSIGN: {
             Value value = evaluate(vm, node->assign.value);
-            VarEntry* entry = findEntry(vm->env, node->assign.name, false);
+            VarEntry* entry = findEntry(vm, node->assign.name, false);
             if (entry) {
                 // Free old string value if exists
                 if (entry->value.type == VAL_STRING && entry->value.stringVal) {
@@ -399,7 +414,7 @@ static Value evaluate(VM* vm, Node* node) {
         }
         
         case NODE_EXPR_VAR: {
-            VarEntry* entry = findEntry(vm->env, node->var.name, false);
+            VarEntry* entry = findEntry(vm, node->var.name, false);
             if (entry) {
                 return entry->value;
             }
