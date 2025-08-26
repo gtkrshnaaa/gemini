@@ -8,16 +8,17 @@
 
 ### Table of Contents
 
-  * [About The Project](https://www.google.com/search?q=%23about-the-project)
-  * [Features](https://www.google.com/search?q=%23features)
-  * [Getting Started](https://www.google.com/search?q=%23getting-started)
-      * [Prerequisites](https://www.google.com/search?q=%23prerequisites)
-      * [Build Instructions](https://www.google.com/search?q=%23build-instructions)
-  * [Usage](https://www.google.com/search?q=%23usage)
-  * [Language Syntax Showcase](https://www.google.com/search?q=%23language-syntax-showcase)
-  * [Interpreter Architecture](https://www.google.com/search?q=%23interpreter-architecture)
-  * [Project Structure](https://www.google.com/search?q=%23project-structure)
-  * [Author](https://www.google.com/search?q=%23author)
+  * [About The Project](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#about-the-project)
+  * [Features](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#features)
+  * [Getting Started](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#getting-started)
+      * [Prerequisites](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#prerequisites)
+      * [Build Instructions](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#build-instructions)
+  * [Usage](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#usage)
+  * [Language Syntax Showcase](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#language-syntax-showcase)
+  * [Interpreter Architecture](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#interpreter-architecture)
+  * [Project Structure](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#project-structure)
+  * [Complex Code Demonstration](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#complex-code-gemini-language-interpreter-can-run)
+  * [Author](https://github.com/gtkrshnaaa/gemini?tab=readme-ov-file#author)
 
 -----
 
