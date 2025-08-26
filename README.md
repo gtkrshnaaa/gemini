@@ -211,7 +211,7 @@ The Gemini interpreter follows a classic three-stage pipeline:
 
 `examples/test.gemini`
 
-```gemini
+```c
 
 // ===============================================
 // GEMINI LANGUAGE COMPLETE FEATURE DEMONSTRATION
