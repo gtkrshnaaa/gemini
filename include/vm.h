@@ -12,6 +12,7 @@ typedef enum {
     VAL_BOOL
 } ValueType;
 
+// Value structure for runtime values
 typedef struct {
     ValueType type;
     union {
@@ -22,36 +23,86 @@ typedef struct {
     };
 } Value;
 
-// Variable structure (simple hash table for variables)
-typedef struct VarEntry {
-    char* key;
-    Value value;
-    struct VarEntry* next;
-} VarEntry;
+// Forward declarations
+typedef struct VarEntry VarEntry;
+typedef struct FuncEntry FuncEntry;
+typedef struct Function Function;
+typedef struct Environment Environment;
+typedef struct CallFrame CallFrame;
+typedef struct VM VM;
 
+// Variable entry structure for hash table
+struct VarEntry {
+    char* key;              // Variable name
+    Value value;            // Variable value
+    struct VarEntry* next;  // Next entry in hash bucket
+};
+
+// Function entry structure for hash table
+struct FuncEntry {
+    char* key;              // Function name
+    Function* function;     // Function definition
+    struct FuncEntry* next; // Next entry in hash bucket
+};
+
+// Hash table size for environments
 #define TABLE_SIZE 256
 
-typedef struct {
-    VarEntry* buckets[TABLE_SIZE];
-} Environment;
+// Environment structure (scope)
+struct Environment {
+    VarEntry* buckets[TABLE_SIZE];     // Variable hash table
+    FuncEntry* funcBuckets[TABLE_SIZE]; // Function hash table
+};
 
-// VM structure (stack-based)
-#define STACK_MAX 256
+// Function structure
+struct Function {
+    Token name;             // Function name
+    Token* params;          // Parameter names
+    int paramCount;         // Number of parameters
+    Node* body;             // Function body (AST node)
+    Environment* closure;   // Closure environment (for lexical scoping)
+};
 
-typedef struct {
-    Value stack[STACK_MAX];
-    int stackTop;
-    Environment* env;
-    // For functions, we can add call stack later
-} VM;
+// VM constants
+#define STACK_MAX 256           // Maximum stack size
+#define CALL_STACK_MAX 64       // Maximum call stack depth
 
-// Initialize VM
+// Call frame structure for function calls
+struct CallFrame {
+    Environment* env;       // Previous environment
+    Value returnValue;      // Function return value
+    bool hasReturned;       // Whether function has returned
+};
+
+// Virtual Machine structure
+struct VM {
+    Value stack[STACK_MAX];         // Value stack
+    int stackTop;                   // Stack pointer
+    Environment* env;               // Current environment
+    Environment* globalEnv;         // Global environment
+    CallFrame callStack[CALL_STACK_MAX]; // Call stack
+    int callStackTop;               // Call stack pointer
+};
+
+// VM function prototypes
+
+/**
+ * Initialize the virtual machine
+ * @param vm Pointer to VM structure
+ */
 void initVM(VM* vm);
 
-// Free VM
+/**
+ * Free all VM resources
+ * @param vm Pointer to VM structure
+ */
 void freeVM(VM* vm);
 
-// Interpret AST
+/**
+ * Interpret and execute AST
+ * @param vm Pointer to VM structure
+ * @param ast Root AST node to execute
+ */
 void interpret(VM* vm, Node* ast);
 
 #endif // VM_H

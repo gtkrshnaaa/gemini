@@ -40,6 +40,39 @@ static char* readFile(const char* path) {
     return buffer;
 }
 
+// Initialize parser
+void initParser(Parser* parser) {
+    parser->tokens = malloc(64 * sizeof(Token));  // Start with 64 tokens
+    if (!parser->tokens) {
+        error("Memory allocation failed.", 0);
+    }
+    parser->current = 0;
+    parser->count = 0;
+    parser->capacity = 64;
+}
+
+// Free parser resources
+void freeParser(Parser* parser) {
+    if (parser->tokens) {
+        free(parser->tokens);
+        parser->tokens = NULL;
+    }
+}
+
+// Add token to parser (grows array as needed)
+void addToken(Parser* parser, Token token) {
+    // Grow array if needed
+    if (parser->count >= parser->capacity) {
+        parser->capacity *= 2;
+        parser->tokens = realloc(parser->tokens, parser->capacity * sizeof(Token));
+        if (!parser->tokens) {
+            error("Memory allocation failed.", token.line);
+        }
+    }
+    
+    parser->tokens[parser->count++] = token;
+}
+
 // Free AST
 static void freeAST(Node* node) {
     if (!node) return;
@@ -57,6 +90,9 @@ static void freeAST(Node* node) {
             freeAST(node->unary.expr);
             break;
         case NODE_EXPR_VAR:
+            break;
+        case NODE_EXPR_CALL:
+            freeAST(node->call.arguments);
             break;
         case NODE_STMT_VAR_DECL:
             freeAST(node->var_decl.initializer);
@@ -111,16 +147,18 @@ int main(int argc, char* argv[]) {
     Lexer lexer;
     initLexer(&lexer, source);
 
-    // Tokenize
+    // Initialize parser with dynamic array
     Parser parser;
-    parser.current = 0;
-    parser.count = 0;
+    initParser(&parser);
+    
+    // Tokenize - no more token limit!
     while (true) {
         Token token = scanToken(&lexer);
-        parser.tokens[parser.count++] = token;
+        addToken(&parser, token);
         if (token.type == TOKEN_EOF) break;
-        if (parser.count >= MAX_TOKENS) error("Too many tokens.", 0);
     }
+
+    printf("Tokenized %d tokens successfully.\n", parser.count);
 
     // Parse
     Node* ast = parse(&parser);
@@ -132,6 +170,7 @@ int main(int argc, char* argv[]) {
 
     // Cleanup
     freeAST(ast);
+    freeParser(&parser);
     freeVM(&vm);
     free(source);
 

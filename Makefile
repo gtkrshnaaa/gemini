@@ -29,7 +29,7 @@ clean:
 	rm -rf $(OBJDIR) $(BINDIR) $(LISTDIR)
 
 run: all
-	./$(EXECUTABLE) examples/showcase.gemini
+	./$(EXECUTABLE) examples/test.gemini
 
 list_source:
 	@mkdir -p $(LISTDIR)

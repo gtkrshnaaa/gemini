@@ -3,15 +3,13 @@
 
 #include "common.h"
 
-// Maximum tokens for parsing (adjust as needed)
-#define MAX_TOKENS 1024
-
 // AST Node types (simplified)
 typedef enum {
     NODE_EXPR_LITERAL,
     NODE_EXPR_BINARY,
     NODE_EXPR_UNARY,
     NODE_EXPR_VAR,
+    NODE_EXPR_CALL,        // Added for function calls
     NODE_STMT_VAR_DECL,
     NODE_STMT_ASSIGN,
     NODE_STMT_PRINT,
@@ -49,6 +47,12 @@ struct Node {
         struct {
             Token name;
         } var;
+        // Function call
+        struct {
+            Token name;
+            Node* arguments;
+            int argumentCount;
+        } call;
         // Var decl
         struct {
             Token name;
@@ -99,14 +103,25 @@ struct Node {
             Node* value;
         } return_stmt;
     };
+    Node* next; // For linked list (function arguments)
 };
 
-// Parser structure
+// Parser structure with dynamic token array
 typedef struct {
-    Token tokens[MAX_TOKENS];
+    Token* tokens;      // Dynamic array of tokens
     int current;
     int count;
+    int capacity;       // Current capacity of the array
 } Parser;
+
+// Initialize parser
+void initParser(Parser* parser);
+
+// Free parser resources
+void freeParser(Parser* parser);
+
+// Add token to parser (grows array as needed)
+void addToken(Parser* parser, Token token);
 
 // Parse tokens into AST
 Node* parse(Parser* parser);

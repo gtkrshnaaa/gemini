@@ -35,7 +35,7 @@ static Node* expression(Parser* parser);
 static Node* statement(Parser* parser);
 static Node* declaration(Parser* parser);
 
-// Parse primary (literals, vars, groups)
+// Parse primary (literals, vars, groups, function calls)
 static Node* primary(Parser* parser) {
     if (match(parser, TOKEN_NUMBER) || match(parser, TOKEN_STRING)) {
         Node* node = malloc(sizeof(Node));
@@ -44,10 +44,37 @@ static Node* primary(Parser* parser) {
         return node;
     }
     if (match(parser, TOKEN_IDENTIFIER)) {
-        Node* node = malloc(sizeof(Node));
-        node->type = NODE_EXPR_VAR;
-        node->var.name = parser->tokens[parser->current - 1];
-        return node;
+        // Check if this is a function call
+        if (check(parser, TOKEN_LEFT_PAREN)) {
+            // Function call
+            Token name = parser->tokens[parser->current - 1];
+            advance(parser); // Consume '('
+            
+            Node* node = malloc(sizeof(Node));
+            node->type = NODE_EXPR_CALL;
+            node->call.name = name;
+            node->call.arguments = NULL;
+            node->call.argumentCount = 0;
+            
+            // Parse arguments
+            if (!check(parser, TOKEN_RIGHT_PAREN)) {
+                Node** currentArg = &node->call.arguments;
+                do {
+                    *currentArg = expression(parser);
+                    node->call.argumentCount++;
+                    currentArg = &(*currentArg)->next;
+                } while (match(parser, TOKEN_COMMA));
+            }
+            
+            consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+            return node;
+        } else {
+            // Variable reference
+            Node* node = malloc(sizeof(Node));
+            node->type = NODE_EXPR_VAR;
+            node->var.name = parser->tokens[parser->current - 1];
+            return node;
+        }
     }
     if (match(parser, TOKEN_LEFT_PAREN)) {
         Node* expr = expression(parser);
@@ -60,7 +87,7 @@ static Node* primary(Parser* parser) {
 
 // Unary
 static Node* unary(Parser* parser) {
-    if (match(parser, TOKEN_MINUS) || match(parser, TOKEN_PLUS)) { // Support unary +/-
+    if (match(parser, TOKEN_MINUS) || match(parser, TOKEN_PLUS)) {
         Token op = parser->tokens[parser->current - 1];
         Node* expr = unary(parser);
         Node* node = malloc(sizeof(Node));
@@ -344,8 +371,7 @@ static Node* declaration(Parser* parser) {
     return statement(parser);
 }
 
-// Main parse function: Tokenize first? Wait, parser takes pre-tokenized
-// But in main, we tokenize.
+// Main parse function
 Node* parse(Parser* parser) {
     // Parse top-level declarations into a block
     Node* root = malloc(sizeof(Node));

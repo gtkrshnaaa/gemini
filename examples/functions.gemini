@@ -1,0 +1,34 @@
+// Function examples
+function greet(name) {
+    print("Hello, " + name + "!");
+}
+
+function add(a, b) {
+    return a + b;
+}
+
+function factorial(n) {
+    if (n <= 1) {
+        return 1;
+    }
+    return n * factorial(n - 1);
+}
+
+// Main program
+greet("Gemini User");
+
+var result = add(5, 3);
+print("5 + 3 = " + result);
+
+var fact = factorial(5);
+print("5! = " + fact);
+
+// Function with multiple statements
+function calculate(x, y) {
+    var sum = x + y;
+    var product = x * y;
+    return "Sum: " + sum + ", Product: " + product;
+}
+
+var calcResult = calculate(4, 7);
+print(calcResult);
