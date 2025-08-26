@@ -31,6 +31,9 @@ clean:
 run: all
 	./$(EXECUTABLE) examples/test.gemini
 
+modularity-run: all
+	./$(EXECUTABLE) examples/modularity/main.gemini
+
 list_source:
 	@mkdir -p $(LISTDIR)
 	@echo "Creating source code listing..."
@@ -45,4 +48,4 @@ list_source:
 	done
 	@echo "Source code listing created at $(LISTDIR)/listing.txt"
 
-.PHONY: all clean run list_source
+.PHONY: all clean run modularity-run list_source

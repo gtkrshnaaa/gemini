@@ -1,0 +1,17 @@
+import geometry;
+import stats;
+
+var radius = 5;
+var area = geometry.calculateArea(radius);
+var circumference = geometry.calculateCircumference(radius);
+var numbers = "1,2,3,4,5";
+var mean = stats.calculateMean(numbers);
+var variance = stats.calculateVariance(numbers);
+
+print("=== Geometry and Statistics Calculator ===");
+print("Radius: " + radius);
+print("Area: " + area);
+print("Circumference: " + circumference);
+print("Numbers: " + numbers);
+print("Mean: " + mean);
+print("Variance: " + variance);

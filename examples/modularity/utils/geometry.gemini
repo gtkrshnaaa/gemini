@@ -1,0 +1,13 @@
+export geometry;
+
+import math;
+
+var PI = 3.14159;
+
+function calculateArea(radius) {
+    return math.multiply(PI, math.multiply(radius, radius));
+}
+
+function calculateCircumference(radius) {
+    return math.multiply(2, math.multiply(PI, radius));
+}
