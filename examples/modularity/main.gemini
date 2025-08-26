@@ -1,12 +1,12 @@
-import geometry;
-import stats;
+import geometry as gmtry;
+import stats as stts;
 
 var radius = 5;
-var area = geometry.calculateArea(radius);
-var circumference = geometry.calculateCircumference(radius);
+var area = gmtry.calculateArea(radius);
+var circumference = gmtry.calculateCircumference(radius);
 var numbers = "1,2,3,4,5";
-var mean = stats.calculateMean(numbers);
-var variance = stats.calculateVariance(numbers);
+var mean = stts.calculateMean(numbers);
+var variance = stts.calculateVariance(numbers);
 
 print("=== Geometry and Statistics Calculator ===");
 print("Radius: " + radius);

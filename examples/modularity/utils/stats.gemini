@@ -1,6 +1,4 @@
-export stats;
-
-import math;
+import math as mth;
 
 function calculateMean(numbers) {
     var sum = 0;
@@ -11,7 +9,7 @@ function calculateMean(numbers) {
     while (i < numbers.length) {
         if (numbers[i] == ',') {
             var num = parseNumber(current);
-            sum = math.add(sum, num);
+            sum = mth.add(sum, num);
             count = count + 1;
             current = "";
         } else {
@@ -22,7 +20,7 @@ function calculateMean(numbers) {
     
     if (current != "") {
         var num = parseNumber(current);
-        sum = math.add(sum, num);
+        sum = mth.add(sum, num);
         count = count + 1;
     }
     
@@ -40,7 +38,7 @@ function calculateVariance(numbers) {
         if (numbers[i] == ',') {
             var num = parseNumber(current);
             var diff = num - mean;
-            sumSquares = math.add(sumSquares, math.multiply(diff, diff));
+            sumSquares = mth.add(sumSquares, mth.multiply(diff, diff));
             count = count + 1;
             current = "";
         } else {
@@ -52,7 +50,7 @@ function calculateVariance(numbers) {
     if (current != "") {
         var num = parseNumber(current);
         var diff = num - mean;
-        sumSquares = math.add(sumSquares, math.multiply(diff, diff));
+        sumSquares = mth.add(sumSquares, mth.multiply(diff, diff));
         count = count + 1;
     }
     
