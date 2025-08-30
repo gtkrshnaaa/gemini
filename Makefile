@@ -37,6 +37,9 @@ modularity-run: all
 arrays-maps-run: all
 	./$(EXECUTABLE) examples/arrays_maps.gemini
 
+project-test-run: all
+	./$(EXECUTABLE) examples/project_test/main.gemini
+
 list_source:
 	@mkdir -p $(LISTDIR)
 	@echo "Creating source code listing..."
@@ -51,4 +54,4 @@ list_source:
 	done
 	@echo "Source code listing created at $(LISTDIR)/listing.txt"
 
-.PHONY: all clean run modularity-run arrays-maps-run list_source
+.PHONY: all clean run modularity-run arrays-maps-run project-test-run list_source
