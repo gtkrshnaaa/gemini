@@ -9,8 +9,12 @@ typedef enum {
     VAL_INT,
     VAL_FLOAT,
     VAL_STRING,
-    VAL_BOOL
+    VAL_BOOL,
+    VAL_MODULE
 } ValueType;
+
+// Value structure for runtime values
+typedef struct Module Module;
 
 // Value structure for runtime values
 typedef struct {
@@ -20,6 +24,7 @@ typedef struct {
         double floatVal;
         char* stringVal;
         bool boolVal;
+        Module* moduleVal;
     };
 } Value;
 
@@ -54,6 +59,15 @@ struct Environment {
     FuncEntry* funcBuckets[TABLE_SIZE]; // Function hash table
 };
 
+// Module wrapper
+struct Module {
+    char* name;
+    Environment* env;
+    // Keep the module source buffer alive for the lifetime of the module,
+    // because AST Tokens point into this buffer.
+    char* source;
+};
+
 // Function structure
 struct Function {
     Token name;             // Function name
@@ -80,8 +94,10 @@ struct VM {
     int stackTop;                   // Stack pointer
     Environment* env;               // Current environment
     Environment* globalEnv;         // Global environment
+    Environment* defEnv;            // Target environment for function definitions
     CallFrame callStack[CALL_STACK_MAX]; // Call stack
     int callStackTop;               // Call stack pointer
+    char projectRoot[1024];         // Project root directory for module search
 };
 
 // VM function prototypes

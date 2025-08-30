@@ -9,7 +9,9 @@ typedef enum {
     NODE_EXPR_BINARY,
     NODE_EXPR_UNARY,
     NODE_EXPR_VAR,
-    NODE_EXPR_CALL,        // Added for function calls
+    NODE_EXPR_CALL,        // function calls
+    NODE_EXPR_GET,         // object.property
+    NODE_EXPR_INDEX,       // target[index]
     NODE_STMT_VAR_DECL,
     NODE_STMT_ASSIGN,
     NODE_STMT_PRINT,
@@ -18,7 +20,8 @@ typedef enum {
     NODE_STMT_FOR,
     NODE_STMT_BLOCK,
     NODE_STMT_FUNCTION,
-    NODE_STMT_RETURN
+    NODE_STMT_RETURN,
+    NODE_STMT_IMPORT
 } NodeType;
 
 // Forward declaration for AST Node
@@ -47,12 +50,22 @@ struct Node {
         struct {
             Token name;
         } var;
-        // Function call
+        // Function call: callee(arguments)
         struct {
-            Token name;
-            Node* arguments;
+            Node* callee;
+            Node* arguments; // linked list via next
             int argumentCount;
         } call;
+        // Member access: object.name
+        struct {
+            Node* object;
+            Token name;
+        } get;
+        // Indexing: target[index]
+        struct {
+            Node* target;
+            Node* index;
+        } index;
         // Var decl
         struct {
             Token name;
@@ -102,6 +115,11 @@ struct Node {
         struct {
             Node* value;
         } return_stmt;
+        // Import statement: import module as alias;
+        struct {
+            Token module;
+            Token alias;
+        } import_stmt;
     };
     Node* next; // For linked list (function arguments)
 };

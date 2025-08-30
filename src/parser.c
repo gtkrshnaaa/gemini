@@ -35,51 +35,30 @@ static Node* expression(Parser* parser);
 static Node* statement(Parser* parser);
 static Node* declaration(Parser* parser);
 
-// Parse primary (literals, vars, groups, function calls)
+// Forward for postfix
+static Node* finishPostfix(Parser* parser, Node* expr);
+
+// Parse primary (literals, vars, groups)
 static Node* primary(Parser* parser) {
     if (match(parser, TOKEN_NUMBER) || match(parser, TOKEN_STRING)) {
         Node* node = malloc(sizeof(Node));
+        node->next = NULL;
         node->type = NODE_EXPR_LITERAL;
         node->literal.token = parser->tokens[parser->current - 1];
         return node;
     }
     if (match(parser, TOKEN_IDENTIFIER)) {
-        // Check if this is a function call
-        if (check(parser, TOKEN_LEFT_PAREN)) {
-            // Function call
-            Token name = parser->tokens[parser->current - 1];
-            advance(parser); // Consume '('
-            
-            Node* node = malloc(sizeof(Node));
-            node->type = NODE_EXPR_CALL;
-            node->call.name = name;
-            node->call.arguments = NULL;
-            node->call.argumentCount = 0;
-            
-            // Parse arguments
-            if (!check(parser, TOKEN_RIGHT_PAREN)) {
-                Node** currentArg = &node->call.arguments;
-                do {
-                    *currentArg = expression(parser);
-                    node->call.argumentCount++;
-                    currentArg = &(*currentArg)->next;
-                } while (match(parser, TOKEN_COMMA));
-            }
-            
-            consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
-            return node;
-        } else {
-            // Variable reference
-            Node* node = malloc(sizeof(Node));
-            node->type = NODE_EXPR_VAR;
-            node->var.name = parser->tokens[parser->current - 1];
-            return node;
-        }
+        // Variable reference base
+        Node* node = malloc(sizeof(Node));
+        node->next = NULL;
+        node->type = NODE_EXPR_VAR;
+        node->var.name = parser->tokens[parser->current - 1];
+        return finishPostfix(parser, node);
     }
     if (match(parser, TOKEN_LEFT_PAREN)) {
         Node* expr = expression(parser);
         consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
-        return expr;
+        return finishPostfix(parser, expr);
     }
     error("Expect expression.", parser->tokens[parser->current].line);
     return NULL;
@@ -91,12 +70,58 @@ static Node* unary(Parser* parser) {
         Token op = parser->tokens[parser->current - 1];
         Node* expr = unary(parser);
         Node* node = malloc(sizeof(Node));
+        node->next = NULL;
         node->type = NODE_EXPR_UNARY;
         node->unary.op = op;
         node->unary.expr = expr;
         return node;
     }
     return primary(parser);
+}
+
+// Postfix: calls, member access, indexing (left-assoc, chainable)
+static Node* finishPostfix(Parser* parser, Node* expr) {
+    for (;;) {
+        if (match(parser, TOKEN_LEFT_PAREN)) {
+            Node* call = malloc(sizeof(Node));
+            call->next = NULL;
+            call->type = NODE_EXPR_CALL;
+            call->call.callee = expr;
+            call->call.arguments = NULL;
+            call->call.argumentCount = 0;
+
+            if (!check(parser, TOKEN_RIGHT_PAREN)) {
+                Node** currentArg = &call->call.arguments;
+                do {
+                    *currentArg = expression(parser);
+                    call->call.argumentCount++;
+                    currentArg = &(*currentArg)->next;
+                } while (match(parser, TOKEN_COMMA));
+            }
+            consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+            expr = call;
+        } else if (match(parser, TOKEN_DOT)) {
+            Token name = consume(parser, TOKEN_IDENTIFIER, "Expect property name after '.'.");
+            Node* get = malloc(sizeof(Node));
+            get->next = NULL;
+            get->type = NODE_EXPR_GET;
+            get->get.object = expr;
+            get->get.name = name;
+            expr = get;
+        } else if (match(parser, TOKEN_LEFT_BRACKET)) {
+            Node* indexExpr = expression(parser);
+            consume(parser, TOKEN_RIGHT_BRACKET, "Expect ']' after index expression.");
+            Node* idx = malloc(sizeof(Node));
+            idx->next = NULL;
+            idx->type = NODE_EXPR_INDEX;
+            idx->index.target = expr;
+            idx->index.index = indexExpr;
+            expr = idx;
+        } else {
+            break;
+        }
+    }
+    return expr;
 }
 
 // Factor (* / %)
@@ -106,6 +131,7 @@ static Node* factor(Parser* parser) {
         Token op = parser->tokens[parser->current - 1];
         Node* right = unary(parser);
         Node* node = malloc(sizeof(Node));
+        node->next = NULL;
         node->type = NODE_EXPR_BINARY;
         node->binary.left = expr;
         node->binary.op = op;
@@ -172,6 +198,7 @@ static Node* assignment(Parser* parser) {
         Node* value = assignment(parser); // Right-assoc
         if (expr->type == NODE_EXPR_VAR) {
             Node* node = malloc(sizeof(Node));
+            node->next = NULL;
             node->type = NODE_STMT_ASSIGN;
             node->assign.name = expr->var.name;
             node->assign.value = value;
@@ -190,6 +217,7 @@ static Node* expression(Parser* parser) {
 // Block { ... }
 static Node* block(Parser* parser) {
     Node* node = malloc(sizeof(Node));
+    node->next = NULL;
     node->type = NODE_STMT_BLOCK;
     node->block.statements = malloc(8 * sizeof(Node*));
     node->block.count = 0;
@@ -214,6 +242,7 @@ static Node* function(Parser* parser) {
     consume(parser, TOKEN_LEFT_PAREN, "Expect '(' after function name.");
 
     Node* node = malloc(sizeof(Node));
+    node->next = NULL;
     node->type = NODE_STMT_FUNCTION;
     node->function.name = name;
     node->function.params = malloc(8 * sizeof(Token));
@@ -248,6 +277,7 @@ static Node* varDeclaration(Parser* parser) {
     consume(parser, TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
     Node* node = malloc(sizeof(Node));
+    node->next = NULL;
     node->type = NODE_STMT_VAR_DECL;
     node->var_decl.name = name;
     node->var_decl.initializer = initializer;
@@ -260,6 +290,7 @@ static Node* printStatement(Parser* parser) {
     consume(parser, TOKEN_SEMICOLON, "Expect ';' after print value.");
 
     Node* node = malloc(sizeof(Node));
+    node->next = NULL;
     node->type = NODE_STMT_PRINT;
     node->print.expr = expr;
     return node;
@@ -274,6 +305,7 @@ static Node* returnStatement(Parser* parser) {
     consume(parser, TOKEN_SEMICOLON, "Expect ';' after return value.");
 
     Node* node = malloc(sizeof(Node));
+    node->next = NULL;
     node->type = NODE_STMT_RETURN;
     node->return_stmt.value = value;
     return node;
@@ -292,6 +324,7 @@ static Node* ifStatement(Parser* parser) {
     }
 
     Node* node = malloc(sizeof(Node));
+    node->next = NULL;
     node->type = NODE_STMT_IF;
     node->if_stmt.condition = condition;
     node->if_stmt.thenBranch = thenBranch;
@@ -307,6 +340,7 @@ static Node* whileStatement(Parser* parser) {
     Node* body = statement(parser);
 
     Node* node = malloc(sizeof(Node));
+    node->next = NULL;
     node->type = NODE_STMT_WHILE;
     node->while_stmt.condition = condition;
     node->while_stmt.body = body;
@@ -342,6 +376,7 @@ static Node* forStatement(Parser* parser) {
     Node* body = statement(parser);
 
     Node* node = malloc(sizeof(Node));
+    node->next = NULL;
     node->type = NODE_STMT_FOR;
     node->for_stmt.initializer = initializer;
     node->for_stmt.condition = condition;
@@ -361,12 +396,26 @@ static Node* statement(Parser* parser) {
 
     Node* exprStmt = expression(parser);
     consume(parser, TOKEN_SEMICOLON, "Expect ';' after expression.");
+    exprStmt->next = NULL; // Initialize next pointer to NULL
     return exprStmt;
 }
 
 // Declaration (var or stmt or function)
 static Node* declaration(Parser* parser) {
     if (match(parser, TOKEN_VAR)) return varDeclaration(parser);
+    if (match(parser, TOKEN_IMPORT)) {
+        Token module = consume(parser, TOKEN_IDENTIFIER, "Expect module name after 'import'.");
+        consume(parser, TOKEN_AS, "Expect 'as' in import statement.");
+        Token alias = consume(parser, TOKEN_IDENTIFIER, "Expect alias after 'as'.");
+        consume(parser, TOKEN_SEMICOLON, "Expect ';' after import statement.");
+
+        Node* node = malloc(sizeof(Node));
+        node->next = NULL;
+        node->type = NODE_STMT_IMPORT;
+        node->import_stmt.module = module;
+        node->import_stmt.alias = alias;
+        return node;
+    }
     if (match(parser, TOKEN_FUNCTION)) return function(parser);
     return statement(parser);
 }
@@ -375,6 +424,7 @@ static Node* declaration(Parser* parser) {
 Node* parse(Parser* parser) {
     // Parse top-level declarations into a block
     Node* root = malloc(sizeof(Node));
+    root->next = NULL;
     root->type = NODE_STMT_BLOCK;
     root->block.statements = malloc(8 * sizeof(Node*));
     root->block.count = 0;

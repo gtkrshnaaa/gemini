@@ -72,9 +72,19 @@ static TokenType checkKeyword(Lexer* lexer, int start, int length, const char* r
 // Identifier type (keywords or var names)
 static TokenType identifierType(Lexer* lexer) {
     switch (*lexer->start) {
+        case 'i': {
+            // import, if
+            if (lexer->current - lexer->start > 1) {
+                if (*(lexer->start + 1) == 'm') {
+                    return checkKeyword(lexer, 1, 5, "mport", TOKEN_IMPORT);
+                } else if (*(lexer->start + 1) == 'f') {
+                    return checkKeyword(lexer, 1, 1, "f", TOKEN_IF);
+                }
+            }
+            break;
+        }
         case 'v': return checkKeyword(lexer, 1, 2, "ar", TOKEN_VAR);
         case 'p': return checkKeyword(lexer, 1, 4, "rint", TOKEN_PRINT);
-        case 'i': return checkKeyword(lexer, 1, 1, "f", TOKEN_IF);
         case 'e': return checkKeyword(lexer, 1, 3, "lse", TOKEN_ELSE);
         case 'w': return checkKeyword(lexer, 1, 4, "hile", TOKEN_WHILE);
         case 'f':
@@ -85,6 +95,7 @@ static TokenType identifierType(Lexer* lexer) {
                 }
             }
             break;
+        case 'a': return checkKeyword(lexer, 1, 1, "s", TOKEN_AS);
         case 'r': return checkKeyword(lexer, 1, 5, "eturn", TOKEN_RETURN);
     }
     return TOKEN_IDENTIFIER;
@@ -110,7 +121,8 @@ static Token number(Lexer* lexer) {
 
 // Scan string
 static Token string(Lexer* lexer) {
-    while (*lexer->current != '"' && *lexer->current != '\0') {
+    char quote = *(lexer->current - 1); // opening quote char (' or ")
+    while (*lexer->current != quote && *lexer->current != '\0') {
         if (*lexer->current == '\n') lexer->line++;
         lexer->current++;
     }
@@ -140,8 +152,11 @@ Token scanToken(Lexer* lexer) {
         case ')': return makeToken(lexer, TOKEN_RIGHT_PAREN);
         case '{': return makeToken(lexer, TOKEN_LEFT_BRACE);
         case '}': return makeToken(lexer, TOKEN_RIGHT_BRACE);
+        case '[': return makeToken(lexer, TOKEN_LEFT_BRACKET);
+        case ']': return makeToken(lexer, TOKEN_RIGHT_BRACKET);
         case ';': return makeToken(lexer, TOKEN_SEMICOLON);
         case ',': return makeToken(lexer, TOKEN_COMMA);
+        case '.': return makeToken(lexer, TOKEN_DOT);
         case '+': return makeToken(lexer, TOKEN_PLUS);
         case '-': return makeToken(lexer, TOKEN_MINUS);
         case '*': return makeToken(lexer, TOKEN_STAR);
@@ -155,7 +170,9 @@ Token scanToken(Lexer* lexer) {
             return makeToken(lexer, (*lexer->current == '=') ? (lexer->current++, TOKEN_GREATER_EQUAL) : TOKEN_GREATER);
         case '<':
             return makeToken(lexer, (*lexer->current == '=') ? (lexer->current++, TOKEN_LESS_EQUAL) : TOKEN_LESS);
-        case '"': return string(lexer);
+        case '"':
+        case '\'':
+            return string(lexer);
     }
 
     return errorToken(lexer, "Unexpected character.");
