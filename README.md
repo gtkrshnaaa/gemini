@@ -150,6 +150,7 @@ Optionally, specify additional module search paths via `GEMINI_PATH` (colon-sepa
 ```sh
 export GEMINI_PATH=/path/to/modules:/another/path
 make modularity-run
+```
 
 **Arrays/Maps Example:**
 
@@ -159,7 +160,6 @@ Run the arrays/maps demo:
 make arrays-maps-run
 ```
 Script: `examples/arrays_maps.gemini`
-```
 
 ## Language Syntax Showcase
 
@@ -231,30 +231,43 @@ The Gemini interpreter follows a classic three-stage pipeline:
 
 ```
 .
-├── bin/                                # Compiled executable(s)
-├── obj/                                # Intermediate object files
-├── src/                                # C source files (.c)
-│   ├── lexer.c
-│   ├── parser.c
-│   ├── vm.c
-│   └── main.c
-├── include/                            # Header files (.h)
+├── bin
+│   └── gemini
+├── examples
+│   ├── arrays_maps.gemini
+│   ├── modularity
+│   │   ├── main.gemini
+│   │   └── utils
+│   │       ├── geometry.gemini
+│   │       ├── math.gemini
+│   │       └── stats.gemini
+│   ├── project_test
+│   │   ├── main.gemini
+│   │   └── utils
+│   │       ├── inventory.gemini
+│   │       ├── math.gemini
+│   │       └── report.gemini
+│   └── test.gemini
+├── include
 │   ├── common.h
 │   ├── lexer.h
 │   ├── parser.h
 │   └── vm.h
-├── examples/                           # Gemini language script examples
-│   ├── test.gemini
-│   ├── arrays_maps.gemini
-│   └── modularity/
-│       ├── main.gemini
-│       └── utils/
-│           ├── geometry.gemini
-│           ├── math.gemini
-│           └── stats.gemini
-├── Makefile                            # Build and run targets
-├── LICENSE                             # MIT License
-└── README.md                           # Project documentation
+├── LICENSE
+├── Makefile
+├── obj
+│   ├── lexer.o
+│   ├── main.o
+│   ├── parser.o
+│   └── vm.o
+├── README.md
+└── src
+    ├── lexer.c
+    ├── main.c
+    ├── parser.c
+    └── vm.c
+
+10 directories, 26 files
 ```
 
 
