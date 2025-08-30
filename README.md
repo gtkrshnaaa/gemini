@@ -60,6 +60,13 @@ This section details the core features of the Gemini programming language.
   - **Return Values:** Functions can return a value using the `return` statement. If no value is returned, a default of `0` (integer) is provided.
   - **Recursion:** The call stack architecture fully supports recursive function calls, allowing for elegant solutions to problems like factorial or Fibonacci sequences.
 
+**Modules and Imports**
+
+  - **Module Import:** Import modules using `import <name> as <alias>;`.
+  - **Module Cache:** Repeated imports of the same logical module are cached to avoid re-parsing.
+  - **GEMINI_PATH Resolution:** Set `GEMINI_PATH` (colon-separated list of directories) to prioritize module lookup before falling back to the project root.
+  - **Examples:** See `examples/modularity/` and run `make modularity-run`.
+
 ## Getting Started
 
 Follow these instructions to get a local copy up and running.
@@ -117,6 +124,21 @@ This is equivalent to running:
 
 ```sh
 ./bin/gemini examples/test.gemini
+```
+
+**Modularity Example:**
+
+Run the modularity demo:
+
+```sh
+make modularity-run
+```
+
+Optionally, specify additional module search paths via `GEMINI_PATH` (colon-separated):
+
+```sh
+export GEMINI_PATH=/path/to/modules:/another/path
+make modularity-run
 ```
 
 ## Language Syntax Showcase
@@ -202,7 +224,8 @@ The Gemini interpreter follows a classic three-stage pipeline:
 │   ├── parser.h
 │   └── vm.h
 ├── examples/           # Gemini language script examples
-│   └── test.gemini
+│   ├── test.gemini
+│   └── modularity/
 ├── Makefile            # Build script
 └── README.md           # Project documentation
 ```
