@@ -35,6 +35,7 @@ typedef struct Function Function;
 typedef struct Environment Environment;
 typedef struct CallFrame CallFrame;
 typedef struct VM VM;
+typedef struct ModuleEntry ModuleEntry;
 
 // Variable entry structure for hash table
 struct VarEntry {
@@ -68,6 +69,13 @@ struct Module {
     char* source;
 };
 
+// Module cache entry structure
+struct ModuleEntry {
+    char* key;                 // Module name (logical name from import, not alias)
+    Module* module;            // Loaded module object
+    struct ModuleEntry* next;  // Next entry in hash bucket
+};
+
 // Function structure
 struct Function {
     Token name;             // Function name
@@ -98,6 +106,7 @@ struct VM {
     CallFrame callStack[CALL_STACK_MAX]; // Call stack
     int callStackTop;               // Call stack pointer
     char projectRoot[1024];         // Project root directory for module search
+    ModuleEntry* moduleBuckets[TABLE_SIZE]; // Module cache by name
 };
 
 // VM function prototypes

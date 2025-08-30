@@ -15,6 +15,33 @@ static unsigned int hash(const char* key, int length) {
     return hash % TABLE_SIZE;
 }
 
+// Module cache lookup/insert by logical module name
+static ModuleEntry* findModuleEntry(VM* vm, const char* name, int length, bool insert) {
+    unsigned int h = hash(name, length);
+    ModuleEntry* e = vm->moduleBuckets[h];
+    while (e) {
+        if (strncmp(e->key, name, length) == 0 && strlen(e->key) == (size_t)length) {
+            return e;
+        }
+        e = e->next;
+    }
+    if (!insert) return NULL;
+    e = (ModuleEntry*)malloc(sizeof(ModuleEntry));
+    if (!e) error("Memory allocation failed.", 0);
+    e->key = strndup(name, length);
+    if (!e->key) error("Memory allocation failed.", 0);
+    e->module = NULL;
+    e->next = vm->moduleBuckets[h];
+    vm->moduleBuckets[h] = e;
+    return e;
+}
+
+// Check if regular file exists
+static bool fileExists(const char* path) {
+    struct stat st;
+    return stat(path, &st) == 0 && S_ISREG(st.st_mode);
+}
+
 // Find or insert variable with proper scope resolution
 static VarEntry* findEntry(VM* vm, Token name, bool insert) {
     unsigned int h = hash(name.start, name.length);
@@ -459,10 +486,41 @@ static void execute(VM* vm, Node* node) {
             break;
         }
         case NODE_STMT_IMPORT: {
-            // Build filename <module>.gemini and search under projectRoot
+            // Build filename <module>.gemini and resolve via cache, GEMINI_PATH, then projectRoot
             char modName[256];
             snprintf(modName, sizeof(modName), "%.*s.gemini", node->import_stmt.module.length, node->import_stmt.module.start);
-            char* fullPath = searchFileRecursive(vm->projectRoot, modName);
+            // Cache check by logical module name (not alias)
+            ModuleEntry* mentry = findModuleEntry(vm, node->import_stmt.module.start, node->import_stmt.module.length, false);
+            if (mentry && mentry->module) {
+                VarEntry* aliasEntry = findEntry(vm, node->import_stmt.alias, true);
+                aliasEntry->value.type = VAL_MODULE;
+                aliasEntry->value.moduleVal = mentry->module;
+                break;
+            }
+
+            char* fullPath = NULL;
+            char candidate[2048];
+            // Try GEMINI_PATH first for speed and explicitness
+            const char* gp = getenv("GEMINI_PATH");
+            if (gp && *gp) {
+                const char* p = gp;
+                while (*p) {
+                    char dirbuf[1024];
+                    int di = 0;
+                    while (*p && *p != ':' && di < (int)sizeof(dirbuf) - 1) {
+                        dirbuf[di++] = *p++;
+                    }
+                    dirbuf[di] = '\0';
+                    if (*p == ':') p++;
+                    if (di == 0) continue;
+                    snprintf(candidate, sizeof(candidate), "%s/%s", dirbuf, modName);
+                    if (fileExists(candidate)) { fullPath = strdup(candidate); break; }
+                }
+            }
+            // Fallback: search under projectRoot
+            if (!fullPath) {
+                fullPath = searchFileRecursive(vm->projectRoot, modName);
+            }
             if (!fullPath) {
                 error("Module file not found in project.", node->import_stmt.module.line);
             }
@@ -508,6 +566,10 @@ static void execute(VM* vm, Node* node) {
             VarEntry* aliasEntry = findEntry(vm, node->import_stmt.alias, true);
             aliasEntry->value.type = VAL_MODULE;
             aliasEntry->value.moduleVal = module;
+
+            // Store in cache by logical module name (not alias)
+            ModuleEntry* store = findModuleEntry(vm, node->import_stmt.module.start, node->import_stmt.module.length, true);
+            store->module = module;
 
             // Cleanup parser/ast (keep moduleEnv and source for module lifetime)
             // Free AST and parser tokens
@@ -952,6 +1014,7 @@ void initVM(VM* vm) {
     if (!vm->globalEnv) error("Memory allocation failed.", 0);
     memset(vm->globalEnv->buckets, 0, sizeof(vm->globalEnv->buckets));
     memset(vm->globalEnv->funcBuckets, 0, sizeof(vm->globalEnv->funcBuckets));
+    memset(vm->moduleBuckets, 0, sizeof(vm->moduleBuckets));
     
     // Set current environment to global initially
     vm->env = vm->globalEnv;
