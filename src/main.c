@@ -91,6 +91,15 @@ static void freeAST(Node* node) {
             break;
         case NODE_EXPR_VAR:
             break;
+        case NODE_EXPR_GET:
+            // object.property -> free object
+            freeAST(node->get.object);
+            break;
+        case NODE_EXPR_INDEX:
+            // target[index] -> free both
+            freeAST(node->index.target);
+            freeAST(node->index.index);
+            break;
         case NODE_EXPR_CALL:
             freeAST(node->call.arguments);
             break;
@@ -130,6 +139,9 @@ static void freeAST(Node* node) {
             break;
         case NODE_STMT_RETURN:
             freeAST(node->return_stmt.value);
+            break;
+        case NODE_STMT_IMPORT:
+            // tokens only; nothing to free
             break;
     }
     free(node);

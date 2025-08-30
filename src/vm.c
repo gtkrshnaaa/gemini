@@ -692,6 +692,10 @@ static Value evaluate(VM* vm, Node* node) {
                                 isEqual = (left.stringVal == NULL && right.stringVal == NULL);
                             }
                             break;
+                        case VAL_MODULE:
+                            // Compare by module identity (pointer equality)
+                            isEqual = left.moduleVal == right.moduleVal;
+                            break;
                     }
                 }
                 
