@@ -67,6 +67,17 @@ This section details the core features of the Gemini programming language.
   - **GEMINI_PATH Resolution:** Set `GEMINI_PATH` (colon-separated list of directories) to prioritize module lookup before falling back to the project root.
   - **Examples:** See `examples/modularity/` and run `make modularity-run`.
 
+**Arrays and Maps**
+
+  - **Dynamic Arrays:** Create with `array()`, index with `arr[i]`, and assign with `arr[i] = value`.
+  - **Hash Maps:** Create with `map()`, key access via `m[key]` and `m[key] = value` for set/update.
+  - **Built-ins:**
+    - Arrays: `push(arr, value)`, `pop(arr)`, `length(arr)`
+    - Maps: `has(map, key)`, `delete(map, key)`, `keys(map)`, `length(map)`
+  - **Truthiness:** Arrays/Maps are truthy when non-empty (length > 0).
+  - **Equality:** `==`/`!=` use identity (pointer), not deep equality.
+  - **String Concatenation:** Concatenation renders compact descriptors, e.g., array as `[array length=N]` and map as `{map size=N}`.
+
 ## Getting Started
 
 Follow these instructions to get a local copy up and running.
@@ -139,6 +150,15 @@ Optionally, specify additional module search paths via `GEMINI_PATH` (colon-sepa
 ```sh
 export GEMINI_PATH=/path/to/modules:/another/path
 make modularity-run
+
+**Arrays/Maps Example:**
+
+Run the arrays/maps demo:
+
+```sh
+make arrays-maps-run
+```
+Script: `examples/arrays_maps.gemini`
 ```
 
 ## Language Syntax Showcase
@@ -211,23 +231,30 @@ The Gemini interpreter follows a classic three-stage pipeline:
 
 ```
 .
-├── bin/                # Contains the compiled executable
-├── obj/                # Stores intermediate object files
-├── src/                # C source files (.c)
+├── bin/                                # Compiled executable(s)
+├── obj/                                # Intermediate object files
+├── src/                                # C source files (.c)
 │   ├── lexer.c
 │   ├── parser.c
 │   ├── vm.c
 │   └── main.c
-├── include/            # Header files (.h)
+├── include/                            # Header files (.h)
 │   ├── common.h
 │   ├── lexer.h
 │   ├── parser.h
 │   └── vm.h
-├── examples/           # Gemini language script examples
+├── examples/                           # Gemini language script examples
 │   ├── test.gemini
+│   ├── arrays_maps.gemini
 │   └── modularity/
-├── Makefile            # Build script
-└── README.md           # Project documentation
+│       ├── main.gemini
+│       └── utils/
+│           ├── geometry.gemini
+│           ├── math.gemini
+│           └── stats.gemini
+├── Makefile                            # Build and run targets
+├── LICENSE                             # MIT License
+└── README.md                           # Project documentation
 ```
 
 
