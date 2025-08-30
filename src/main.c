@@ -109,6 +109,12 @@ static void freeAST(Node* node) {
         case NODE_STMT_ASSIGN:
             freeAST(node->assign.value);
             break;
+        case NODE_STMT_INDEX_ASSIGN:
+            // target[index] = value
+            freeAST(node->index_assign.target);
+            freeAST(node->index_assign.index);
+            freeAST(node->index_assign.value);
+            break;
         case NODE_STMT_PRINT:
             freeAST(node->print.expr);
             break;

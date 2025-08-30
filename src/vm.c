@@ -15,6 +15,13 @@ static unsigned int hash(const char* key, int length) {
     return hash % TABLE_SIZE;
 }
 
+// Simple integer hash to bucket index
+static unsigned int hashIntKey(int k) {
+    unsigned int x = (unsigned int)k;
+    x ^= x >> 16; x *= 0x7feb352d; x ^= x >> 15; x *= 0x846ca68b; x ^= x >> 16;
+    return x % TABLE_SIZE;
+}
+
 // Module cache lookup/insert by logical module name
 static ModuleEntry* findModuleEntry(VM* vm, const char* name, int length, bool insert) {
     unsigned int h = hash(name, length);
@@ -213,6 +220,100 @@ static bool tryCharCode(Value v, int* out) {
     return false;
 }
 
+// ---- Array helpers ----
+static Array* newArray(void) {
+    Array* a = (Array*)malloc(sizeof(Array));
+    if (!a) error("Memory allocation failed.", 0);
+    a->items = NULL; a->count = 0; a->capacity = 0;
+    return a;
+}
+static void arrayEnsureCap(Array* a, int cap) {
+    if (a->capacity >= cap) return;
+    int nc = a->capacity < 8 ? 8 : a->capacity * 2;
+    if (nc < cap) nc = cap;
+    Value* ni = (Value*)realloc(a->items, sizeof(Value) * nc);
+    if (!ni) error("Memory allocation failed.", 0);
+    a->items = ni; a->capacity = nc;
+}
+static void arrayPush(Array* a, Value v) {
+    arrayEnsureCap(a, a->count + 1);
+    a->items[a->count++] = v;
+}
+static bool arrayPop(Array* a, Value* out) {
+    if (a->count == 0) return false;
+    *out = a->items[a->count - 1];
+    a->count--;
+    return true;
+}
+
+// ---- Map helpers ----
+static Map* newMap(void) {
+    Map* m = (Map*)malloc(sizeof(Map));
+    if (!m) error("Memory allocation failed.", 0);
+    for (int i = 0; i < TABLE_SIZE; i++) m->buckets[i] = NULL;
+    return m;
+}
+static MapEntry* mapFindEntry(Map* m, const char* skey, int slen, int* bucketOut) {
+    unsigned int h = hash(skey, slen);
+    if (bucketOut) *bucketOut = (int)h;
+    MapEntry* e = m->buckets[h];
+    while (e) {
+        if (!e->isIntKey && e->key && (int)strlen(e->key) == slen && strncmp(e->key, skey, slen) == 0) return e;
+        e = e->next;
+    }
+    return NULL;
+}
+static MapEntry* mapFindEntryInt(Map* m, int ikey, int* bucketOut) {
+    unsigned int h = hashIntKey(ikey);
+    if (bucketOut) *bucketOut = (int)h;
+    MapEntry* e = m->buckets[h];
+    while (e) {
+        if (e->isIntKey && e->intKey == ikey) return e;
+        e = e->next;
+    }
+    return NULL;
+}
+static void mapSetStr(Map* m, const char* key, int len, Value v) {
+    int b; MapEntry* e = mapFindEntry(m, key, len, &b);
+    if (e) { e->value = v; return; }
+    e = (MapEntry*)malloc(sizeof(MapEntry)); if (!e) error("Memory allocation failed.", 0);
+    e->isIntKey = false; e->intKey = 0;
+    e->key = strndup(key, len); if (!e->key) { free(e); error("Memory allocation failed.", 0);} 
+    e->value = v; e->next = m->buckets[b]; m->buckets[b] = e;
+}
+static void mapSetInt(Map* m, int ikey, Value v) {
+    int b; MapEntry* e = mapFindEntryInt(m, ikey, &b);
+    if (e) { e->value = v; return; }
+    e = (MapEntry*)malloc(sizeof(MapEntry)); if (!e) error("Memory allocation failed.", 0);
+    e->isIntKey = true; e->intKey = ikey; e->key = NULL; e->value = v; e->next = m->buckets[b]; m->buckets[b] = e;
+}
+static bool mapDeleteStr(Map* m, const char* key, int len) {
+    unsigned int b = hash(key, len);
+    MapEntry* prev = NULL; MapEntry* e = m->buckets[b];
+    while (e) {
+        if (!e->isIntKey && e->key && (int)strlen(e->key) == len && strncmp(e->key, key, len) == 0) {
+            if (prev) prev->next = e->next; else m->buckets[b] = e->next;
+            free(e->key); free(e);
+            return true;
+        }
+        prev = e; e = e->next;
+    }
+    return false;
+}
+static bool mapDeleteInt(Map* m, int ikey) {
+    unsigned int b = hashIntKey(ikey);
+    MapEntry* prev = NULL; MapEntry* e = m->buckets[b];
+    while (e) {
+        if (e->isIntKey && e->intKey == ikey) {
+            if (prev) prev->next = e->next; else m->buckets[b] = e->next;
+            free(e);
+            return true;
+        }
+        prev = e; e = e->next;
+    }
+    return false;
+}
+
 // Forward declarations
 static Value evaluate(VM* vm, Node* node);
 static void execute(VM* vm, Node* node);
@@ -360,6 +461,38 @@ static void execute(VM* vm, Node* node) {
                 case VAL_MODULE:
                     printf("[module %s]\n", (value.moduleVal && value.moduleVal->name) ? value.moduleVal->name : "<anon>");
                     break;
+                case VAL_ARRAY:
+                    printf("[array length=%d]\n", value.arrayVal ? value.arrayVal->count : 0);
+                    break;
+                case VAL_MAP: {
+                    // compute size
+                    int sz = 0; if (value.mapVal) { for (int i = 0; i < TABLE_SIZE; i++) { MapEntry* e = value.mapVal->buckets[i]; while (e) { sz++; e = e->next; } } }
+                    printf("{map size=%d}\n", sz);
+                    break;
+                }
+            }
+            break;
+        }
+        case NODE_STMT_INDEX_ASSIGN: {
+            Value target = evaluate(vm, node->index_assign.target);
+            Value idx = evaluate(vm, node->index_assign.index);
+            Value val = evaluate(vm, node->index_assign.value);
+            if (target.type == VAL_ARRAY) {
+                if (idx.type != VAL_INT) error("Array index must be int.", 0);
+                if (idx.intVal < 0 || idx.intVal >= (target.arrayVal ? target.arrayVal->count : 0)) {
+                    error("Array index out of range.", 0);
+                }
+                target.arrayVal->items[idx.intVal] = val;
+            } else if (target.type == VAL_MAP) {
+                if (idx.type == VAL_INT) {
+                    mapSetInt(target.mapVal, idx.intVal, val);
+                } else if (idx.type == VAL_STRING) {
+                    mapSetStr(target.mapVal, idx.stringVal ? idx.stringVal : "", (int)strlen(idx.stringVal ? idx.stringVal : ""), val);
+                } else {
+                    error("Map key must be int or string.", 0);
+                }
+            } else {
+                error("Index assignment not supported for this type.", 0);
             }
             break;
         }
@@ -382,6 +515,20 @@ static void execute(VM* vm, Node* node) {
                 case VAL_MODULE:
                     isTrue = true; // treat as truthy
                     break;
+                case VAL_ARRAY:
+                    isTrue = cond.arrayVal && cond.arrayVal->count > 0;
+                    break;
+                case VAL_MAP: {
+                    int sz = 0;
+                    if (cond.mapVal) {
+                        for (int i = 0; i < TABLE_SIZE; i++) {
+                            MapEntry* e = cond.mapVal->buckets[i];
+                            while (e) { sz++; e = e->next; }
+                        }
+                    }
+                    isTrue = sz > 0;
+                    break;
+                }
             }
             
             if (isTrue) {
@@ -411,6 +558,20 @@ static void execute(VM* vm, Node* node) {
                     case VAL_MODULE:
                         isTrue = true;
                         break;
+                    case VAL_ARRAY:
+                        isTrue = cond.arrayVal && cond.arrayVal->count > 0;
+                        break;
+                    case VAL_MAP: {
+                        int sz = 0;
+                        if (cond.mapVal) {
+                            for (int i = 0; i < TABLE_SIZE; i++) {
+                                MapEntry* e = cond.mapVal->buckets[i];
+                                while (e) { sz++; e = e->next; }
+                            }
+                        }
+                        isTrue = sz > 0;
+                        break;
+                    }
                 }
                 if (!isTrue) break;
                 execute(vm, node->while_stmt.body);
@@ -442,6 +603,20 @@ static void execute(VM* vm, Node* node) {
                         case VAL_MODULE:
                             condTrue = true;
                             break;
+                        case VAL_ARRAY:
+                            condTrue = cond.arrayVal && cond.arrayVal->count > 0;
+                            break;
+                        case VAL_MAP: {
+                            int sz = 0;
+                            if (cond.mapVal) {
+                                for (int i = 0; i < TABLE_SIZE; i++) {
+                                    MapEntry* e = cond.mapVal->buckets[i];
+                                    while (e) { sz++; e = e->next; }
+                                }
+                            }
+                            condTrue = sz > 0;
+                            break;
+                        }
                     }
                 }
                 if (!condTrue) break;
@@ -698,6 +873,16 @@ static Value evaluate(VM* vm, Node* node) {
                         strncpy(leftStr, "[module]", sizeof(leftStr) - 1);
                         leftStr[sizeof(leftStr) - 1] = '\0';
                         break;
+                    case VAL_ARRAY: {
+                        int l = (left.arrayVal ? left.arrayVal->count : 0);
+                        snprintf(leftStr, sizeof(leftStr), "[array length=%d]", l);
+                        break;
+                    }
+                    case VAL_MAP: {
+                        int sz = 0; if (left.mapVal) { for (int i = 0; i < TABLE_SIZE; i++) { MapEntry* e = left.mapVal->buckets[i]; while (e) { sz++; e = e->next; } } }
+                        snprintf(leftStr, sizeof(leftStr), "{map size=%d}", sz);
+                        break;
+                    }
                 }
                 
                 // Convert right operand to string
@@ -719,6 +904,16 @@ static Value evaluate(VM* vm, Node* node) {
                         strncpy(rightStr, "[module]", sizeof(rightStr) - 1);
                         rightStr[sizeof(rightStr) - 1] = '\0';
                         break;
+                    case VAL_ARRAY: {
+                        int l = (right.arrayVal ? right.arrayVal->count : 0);
+                        snprintf(rightStr, sizeof(rightStr), "[array length=%d]", l);
+                        break;
+                    }
+                    case VAL_MAP: {
+                        int sz = 0; if (right.mapVal) { for (int i = 0; i < TABLE_SIZE; i++) { MapEntry* e = right.mapVal->buckets[i]; while (e) { sz++; e = e->next; } } }
+                        snprintf(rightStr, sizeof(rightStr), "{map size=%d}", sz);
+                        break;
+                    }
                 }
                 
                 result.type = VAL_STRING;
@@ -757,6 +952,14 @@ static Value evaluate(VM* vm, Node* node) {
                         case VAL_MODULE:
                             // Compare by module identity (pointer equality)
                             isEqual = left.moduleVal == right.moduleVal;
+                            break;
+                        case VAL_ARRAY:
+                            // Compare by identity (pointer equality)
+                            isEqual = left.arrayVal == right.arrayVal;
+                            break;
+                        case VAL_MAP:
+                            // Compare by identity (pointer equality)
+                            isEqual = left.mapVal == right.mapVal;
                             break;
                     }
                 }
@@ -928,6 +1131,96 @@ static Value evaluate(VM* vm, Node* node) {
                     func = findFunctionInEnv(vm->defEnv, node->call.callee->var.name);
                 }
                 errLine = node->call.callee->var.name.line;
+                // Built-ins: intercept by name if not found as user function
+                if (!func) {
+                    // name buffer
+                    char fname[64]; int flen = node->call.callee->var.name.length;
+                    if (flen >= (int)sizeof(fname)) flen = (int)sizeof(fname) - 1;
+                    memcpy(fname, node->call.callee->var.name.start, flen); fname[flen] = '\0';
+
+                    // Evaluate arguments first (max 16 as below)
+                    Value args[16]; int argCount = 0; Node* argN = node->call.arguments;
+                    while (argN && argCount < 16) { args[argCount++] = evaluate(vm, argN); argN = argN->next; }
+                    if (argCount >= 16 && argN) { error("Too many arguments (max 16).", errLine); }
+
+                    // array()
+                    if (strcmp(fname, "array") == 0) {
+                        if (argCount != 0) error("array() takes 0 arguments.", errLine);
+                        Value v; v.type = VAL_ARRAY; v.arrayVal = newArray(); return v;
+                    }
+                    // map()
+                    if (strcmp(fname, "map") == 0) {
+                        if (argCount != 0) error("map() takes 0 arguments.", errLine);
+                        Value v; v.type = VAL_MAP; v.mapVal = newMap(); return v;
+                    }
+                    // length(x)
+                    if (strcmp(fname, "length") == 0) {
+                        if (argCount != 1) error("length(x) takes 1 argument.", errLine);
+                        Value v; v.type = VAL_INT; v.intVal = 0;
+                        if (args[0].type == VAL_STRING) v.intVal = args[0].stringVal ? (int)strlen(args[0].stringVal) : 0;
+                        else if (args[0].type == VAL_ARRAY) v.intVal = args[0].arrayVal ? args[0].arrayVal->count : 0;
+                        else if (args[0].type == VAL_MAP) {
+                            int sz = 0; if (args[0].mapVal) { for (int i = 0; i < TABLE_SIZE; i++) { MapEntry* e = args[0].mapVal->buckets[i]; while (e) { sz++; e = e->next; } } }
+                            v.intVal = sz;
+                        } else error("length() unsupported type.", errLine);
+                        return v;
+                    }
+                    // push(a, v) -> returns new length
+                    if (strcmp(fname, "push") == 0) {
+                        if (argCount != 2) error("push(a, v) takes 2 arguments.", errLine);
+                        if (args[0].type != VAL_ARRAY || !args[0].arrayVal) error("push() requires array as first arg.", errLine);
+                        arrayPush(args[0].arrayVal, args[1]);
+                        Value v; v.type = VAL_INT; v.intVal = args[0].arrayVal->count; return v;
+                    }
+                    // pop(a) -> returns popped value
+                    if (strcmp(fname, "pop") == 0) {
+                        if (argCount != 1) error("pop(a) takes 1 argument.", errLine);
+                        if (args[0].type != VAL_ARRAY || !args[0].arrayVal) error("pop() requires array.", errLine);
+                        Value out; if (!arrayPop(args[0].arrayVal, &out)) error("pop() on empty array.", errLine);
+                        return out;
+                    }
+                    // has(m, k) -> bool
+                    if (strcmp(fname, "has") == 0) {
+                        if (argCount != 2) error("has(m, k) takes 2 arguments.", errLine);
+                        if (args[0].type != VAL_MAP || !args[0].mapVal) error("has() requires map.", errLine);
+                        bool present = false;
+                        if (args[1].type == VAL_INT) { present = mapFindEntryInt(args[0].mapVal, args[1].intVal, NULL) != NULL; }
+                        else if (args[1].type == VAL_STRING) { const char* s = args[1].stringVal ? args[1].stringVal : ""; present = mapFindEntry(args[0].mapVal, s, (int)strlen(s), NULL) != NULL; }
+                        else error("has() key must be int or string.", errLine);
+                        Value v; v.type = VAL_BOOL; v.boolVal = present; return v;
+                    }
+                    // delete(m, k) -> bool (true if removed)
+                    if (strcmp(fname, "delete") == 0) {
+                        if (argCount != 2) error("delete(m, k) takes 2 arguments.", errLine);
+                        if (args[0].type != VAL_MAP || !args[0].mapVal) error("delete() requires map.", errLine);
+                        bool removed = false;
+                        if (args[1].type == VAL_INT) removed = mapDeleteInt(args[0].mapVal, args[1].intVal);
+                        else if (args[1].type == VAL_STRING) { const char* s = args[1].stringVal ? args[1].stringVal : ""; removed = mapDeleteStr(args[0].mapVal, s, (int)strlen(s)); }
+                        else error("delete() key must be int or string.", errLine);
+                        Value v; v.type = VAL_BOOL; v.boolVal = removed; return v;
+                    }
+                    // keys(m) -> array of string keys (int keys converted to decimal strings)
+                    if (strcmp(fname, "keys") == 0) {
+                        if (argCount != 1) error("keys(m) takes 1 argument.", errLine);
+                        if (args[0].type != VAL_MAP || !args[0].mapVal) error("keys() requires map.", errLine);
+                        Array* arr = newArray();
+                        for (int i = 0; i < TABLE_SIZE; i++) {
+                            MapEntry* e = args[0].mapVal->buckets[i];
+                            while (e) {
+                                Value sv; sv.type = VAL_STRING;
+                                if (e->isIntKey) {
+                                    char buf[32]; snprintf(buf, sizeof(buf), "%d", e->intKey);
+                                    sv.stringVal = strdup(buf); if (!sv.stringVal) error("Memory allocation failed.", errLine);
+                                } else {
+                                    sv.stringVal = strdup(e->key ? e->key : ""); if (!sv.stringVal) error("Memory allocation failed.", errLine);
+                                }
+                                arrayPush(arr, sv);
+                                e = e->next;
+                            }
+                        }
+                        Value v; v.type = VAL_ARRAY; v.arrayVal = arr; return v;
+                    }
+                }
             } else if (node->call.callee->type == NODE_EXPR_GET) {
                 Value obj = evaluate(vm, node->call.callee->get.object);
                 if (obj.type == VAL_MODULE) {
@@ -991,6 +1284,24 @@ static Value evaluate(VM* vm, Node* node) {
                 s[0] = target.stringVal[idx.intVal];
                 s[1] = '\0';
                 Value v; v.type = VAL_STRING; v.stringVal = s; return v;
+            } else if (target.type == VAL_ARRAY && idx.type == VAL_INT) {
+                if (!target.arrayVal) { Value v; v.type = VAL_INT; v.intVal = 0; return v; }
+                if (idx.intVal < 0 || idx.intVal >= target.arrayVal->count) error("Array index out of range.", 0);
+                return target.arrayVal->items[idx.intVal];
+            } else if (target.type == VAL_MAP) {
+                if (!target.mapVal) { Value v; v.type = VAL_INT; v.intVal = 0; return v; }
+                if (idx.type == VAL_INT) {
+                    MapEntry* e = mapFindEntryInt(target.mapVal, idx.intVal, NULL);
+                    if (!e) error("Map key not found.", 0);
+                    return e->value;
+                } else if (idx.type == VAL_STRING) {
+                    const char* s = idx.stringVal ? idx.stringVal : "";
+                    MapEntry* e = mapFindEntry(target.mapVal, s, (int)strlen(s), NULL);
+                    if (!e) error("Map key not found.", 0);
+                    return e->value;
+                } else {
+                    error("Map index must be int or string.", 0);
+                }
             }
             error("Indexing not supported for this type.", 0);
             Value nullVal = {VAL_INT, .intVal = 0};

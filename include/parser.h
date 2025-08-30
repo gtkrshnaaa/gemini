@@ -14,6 +14,7 @@ typedef enum {
     NODE_EXPR_INDEX,       // target[index]
     NODE_STMT_VAR_DECL,
     NODE_STMT_ASSIGN,
+    NODE_STMT_INDEX_ASSIGN,
     NODE_STMT_PRINT,
     NODE_STMT_IF,
     NODE_STMT_WHILE,
@@ -76,6 +77,12 @@ struct Node {
             Token name;
             Node* value;
         } assign;
+        // Index assignment: target[index] = value
+        struct {
+            Node* target;
+            Node* index;
+            Node* value;
+        } index_assign;
         // Print
         struct {
             Node* expr;

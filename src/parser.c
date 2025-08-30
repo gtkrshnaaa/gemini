@@ -203,6 +203,14 @@ static Node* assignment(Parser* parser) {
             node->assign.name = expr->var.name;
             node->assign.value = value;
             return node;
+        } else if (expr->type == NODE_EXPR_INDEX) {
+            Node* node = malloc(sizeof(Node));
+            node->next = NULL;
+            node->type = NODE_STMT_INDEX_ASSIGN;
+            node->index_assign.target = expr->index.target;
+            node->index_assign.index = expr->index.index;
+            node->index_assign.value = value;
+            return node;
         }
         error("Invalid assignment target.", equals.line);
     }

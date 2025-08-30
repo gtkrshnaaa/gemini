@@ -10,11 +10,15 @@ typedef enum {
     VAL_FLOAT,
     VAL_STRING,
     VAL_BOOL,
-    VAL_MODULE
+    VAL_MODULE,
+    VAL_ARRAY,
+    VAL_MAP
 } ValueType;
 
 // Value structure for runtime values
 typedef struct Module Module;
+typedef struct Array Array;
+typedef struct Map Map;
 
 // Value structure for runtime values
 typedef struct {
@@ -25,6 +29,8 @@ typedef struct {
         char* stringVal;
         bool boolVal;
         Module* moduleVal;
+        Array* arrayVal;
+        Map* mapVal;
     };
 } Value;
 
@@ -67,6 +73,27 @@ struct Module {
     // Keep the module source buffer alive for the lifetime of the module,
     // because AST Tokens point into this buffer.
     char* source;
+};
+
+// Minimal dynamic array implementation
+struct Array {
+    Value* items;
+    int count;
+    int capacity;
+};
+
+// Minimal map (hash table) implementation supporting string and int keys
+typedef struct MapEntry MapEntry;
+struct MapEntry {
+    bool isIntKey;          // true: use intKey; false: use key (string)
+    char* key;              // string key (owned)
+    int intKey;             // int key
+    Value value;            // stored value
+    MapEntry* next;         // chaining in bucket
+};
+
+struct Map {
+    MapEntry* buckets[TABLE_SIZE];
 };
 
 // Module cache entry structure
